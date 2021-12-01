@@ -13,7 +13,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static model.Variables.MCPAL_TAG;
 
@@ -24,20 +27,21 @@ import static model.Variables.MCPAL_TAG;
  * - Fix the console input
  */
 public class Server {
-
     public static volatile boolean isServerRunning = false;
 
-    public static Path MC_PAL_LOCATION_DIR;
-    public static Path BACKUP_TARGET_DIR_PATH;
+    private static Path MC_PAL_LOCATION_DIR;
+    private static Path BACKUP_TARGET_DIR_PATH;
+    private static Path SERVER_DIR_PATH;
 
     private static List<String> ADDITIONAL_COMMANDS_AFTER_BACKUP;
     private static Thread consoleThread;
     private static Thread consoleWriterThread;
     public static volatile Process serverProcess;
 
-    public Server(Path mcPalLocationDir, String targetDir, List<String> additionalThingsToRun) {
+    public Server(Path mcPalLocationDir, String targetDir, String serverPath, List<String> additionalThingsToRun) {
         MC_PAL_LOCATION_DIR = mcPalLocationDir;
         BACKUP_TARGET_DIR_PATH = Paths.get(targetDir);
+        SERVER_DIR_PATH = Paths.get(serverPath);
         ADDITIONAL_COMMANDS_AFTER_BACKUP = additionalThingsToRun;
 
         printStartupInfo();
@@ -84,8 +88,8 @@ public class Server {
         } else {
             Process process = null;
             try {
-                final ProcessBuilder processBuilder = new ProcessBuilder("./bedrock_server");
-                processBuilder.environment().put("LD_LIBRARY_PATH", ".");
+                final ProcessBuilder processBuilder = new ProcessBuilder(SERVER_DIR_PATH.toString() + "/bedrock_server");
+                processBuilder.environment().put("LD_LIBRARY_PATH", SERVER_DIR_PATH.toString());
                 processBuilder.directory(MC_PAL_LOCATION_DIR.toFile());
                 process = processBuilder.start();
 

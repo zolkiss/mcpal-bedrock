@@ -11,12 +11,19 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static model.Variables.ADDITIONAL_ARGUMENT_PREFIX;
+import static model.Variables.BACKUP_PATH_DEFAULT_VALUE;
+import static model.Variables.BACKUP_PATH_PREFIX;
 import static model.Variables.CONFIG_FILENAME;
+import static model.Variables.SERVER_FILE_NOT_FOUND;
+import static model.Variables.SERVER_PATH_DEFAULT_VALUE;
+import static model.Variables.SERVER_PATH_PREFIX;
 
 public class Bootstrapper {
 
     private final Path mcPalLocationDir;
     private String backupPath;
+    private String serverPath;
     private List<String> additionalCommandsToRunAfterBackup;
 
     public static void main(String[] args) throws URISyntaxException, IOException {
@@ -42,34 +49,35 @@ public class Bootstrapper {
 
     private Path evaluatePathOfJar() throws URISyntaxException {
         Path fromPath = Paths.get(Server.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getParent();
-        if (!Files.exists(fromPath)) throw new IllegalArgumentException(Variables.SERVER_FILE_NOT_FOUND);
+        if (!Files.exists(fromPath)) throw new IllegalArgumentException(SERVER_FILE_NOT_FOUND);
         return fromPath;
     }
 
     private void extractArgumentsFromCommandLine(List<String> arguments) {
-        backupPath = extractSingleArgument(arguments, Variables.BACKUP_PATH_PREFIX);
+        backupPath = extractSingleArgument(arguments, BACKUP_PATH_PREFIX, BACKUP_PATH_DEFAULT_VALUE);
+        serverPath = extractSingleArgument(arguments, SERVER_PATH_PREFIX, SERVER_PATH_DEFAULT_VALUE);
         if (backupPath.isEmpty()) throwInvalidStartArgumentsException();
         additionalCommandsToRunAfterBackup = extractAdditionalArguments(arguments);
     }
 
     private void bootServer() throws IOException {
-        final Server MCpal = new Server(mcPalLocationDir, backupPath, additionalCommandsToRunAfterBackup);
+        final Server MCpal = new Server(mcPalLocationDir, backupPath, serverPath, additionalCommandsToRunAfterBackup);
         MCpal.start();
     }
 
     private static List<String> extractAdditionalArguments(List<String> arguments) {
         return arguments.stream()
-                .filter(a -> a.startsWith(Variables.ADDITIONAL_ARGUMENT_PREFIX))
-                .map(arg -> arg.substring(Variables.ADDITIONAL_ARGUMENT_PREFIX.length()))
+            .filter(a -> a.startsWith(ADDITIONAL_ARGUMENT_PREFIX))
+            .map(arg -> arg.substring(ADDITIONAL_ARGUMENT_PREFIX.length()))
                 .collect(Collectors.toList());
     }
 
-    private static String extractSingleArgument(List<String> arguments, String argumentPrefix) {
+    private static String extractSingleArgument(List<String> arguments, String argumentPrefix, String defaultValue) {
         return arguments.stream()
-                .filter(arg -> arg.startsWith(argumentPrefix))
-                .findFirst()
-                .map(arg -> arg.substring(argumentPrefix.length()))
-                .orElse(null);
+            .filter(arg -> arg.startsWith(argumentPrefix))
+            .findFirst()
+            .map(arg -> arg.substring(argumentPrefix.length()))
+            .orElse(defaultValue);
     }
 
     private static void throwInvalidStartArgumentsException() {

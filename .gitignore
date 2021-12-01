@@ -10,3 +10,7 @@
 build/
 out/
 bin/
+
+#MCPal Server
+bedrock-server-*
+MCPal.conf
