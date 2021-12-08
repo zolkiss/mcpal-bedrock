@@ -1,15 +1,17 @@
 import controller.Server;
 import model.Variables;
 
-import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static model.Variables.ADDITIONAL_ARGUMENT_PREFIX;
 import static model.Variables.BACKUP_PATH_DEFAULT_VALUE;
@@ -38,7 +40,7 @@ public class Bootstrapper {
             final List<String> arguments = Arrays.asList(args);
             extractArgumentsFromCommandLine(arguments);
             writeConfigFile(mcPalLocationDir, args);
-        } else if (args.length == 0 && Files.exists(mcPalLocationDir.resolve(CONFIG_FILENAME))) {
+        } else if (Files.exists(mcPalLocationDir.resolve(CONFIG_FILENAME))) {
             final List<String> arguments = Files.readAllLines(mcPalLocationDir.resolve(CONFIG_FILENAME));
             Files.delete(mcPalLocationDir.resolve(CONFIG_FILENAME));
             extractArgumentsFromCommandLine(arguments);
@@ -61,8 +63,8 @@ public class Bootstrapper {
     }
 
     private void bootServer() throws IOException {
-        final Server MCpal = new Server(mcPalLocationDir, backupPath, serverPath, additionalCommandsToRunAfterBackup);
-        MCpal.start();
+        final Server mcPal = new Server(mcPalLocationDir, backupPath, serverPath, additionalCommandsToRunAfterBackup);
+        mcPal.start();
     }
 
     private static List<String> extractAdditionalArguments(List<String> arguments) {
@@ -85,14 +87,14 @@ public class Bootstrapper {
     }
 
     private static void writeConfigFile(Path fromPath, String[] args) throws IOException {
-        if (!Files.exists(fromPath.resolve(CONFIG_FILENAME)))
-            Files.createFile(Paths.get(fromPath + "/" + CONFIG_FILENAME));
-        final FileWriter fw = new FileWriter(fromPath + "/" + CONFIG_FILENAME);
-        for (String parameter : args) {
-            fw.write(parameter + System.getProperty("line.separator"));
-        }
-        fw.flush();
-        fw.close();
+        String configContent = Stream.of(args)
+            .map(arg -> String.format("%s%n", arg))
+            .collect(Collectors.joining());
+        Files.write(
+            Paths.get(fromPath.toString(), CONFIG_FILENAME),
+            configContent.getBytes(StandardCharsets.UTF_8),
+            StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING
+        );
     }
 
 }
