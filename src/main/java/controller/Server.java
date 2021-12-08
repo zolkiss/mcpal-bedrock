@@ -33,26 +33,27 @@ public class Server {
     private static Path BACKUP_TARGET_DIR_PATH;
     private static Path SERVER_DIR_PATH;
 
-    private static List<String> ADDITIONAL_COMMANDS_AFTER_BACKUP;
+    private static List<String> BEDROCK_SERVER_COMMANDS_AFTER_BACKUP;
     private static Thread consoleThread;
     private static Thread consoleWriterThread;
     public static volatile Process serverProcess;
 
-    public Server(Path mcPalLocationDir, String targetDir, String serverPath, List<String> additionalThingsToRun) {
-        MC_PAL_LOCATION_DIR = mcPalLocationDir;
-        BACKUP_TARGET_DIR_PATH = Paths.get(targetDir);
-        SERVER_DIR_PATH = Paths.get(serverPath);
-        ADDITIONAL_COMMANDS_AFTER_BACKUP = additionalThingsToRun;
+    public Server(Path mcPalLocationDir, String targetDir, String serverPath, List<String> bedrockServerCommands) {
+        MC_PAL_LOCATION_DIR = mcPalLocationDir.toAbsolutePath();
+        BACKUP_TARGET_DIR_PATH = Paths.get(targetDir).toAbsolutePath();
+        SERVER_DIR_PATH = Paths.get(serverPath).toAbsolutePath();
+        BEDROCK_SERVER_COMMANDS_AFTER_BACKUP = bedrockServerCommands;
 
         printStartupInfo();
     }
 
     private void printStartupInfo() {
         System.out.println("***********************");
-        System.out.println("Path of the server:   " + MC_PAL_LOCATION_DIR);
+        System.out.println("Path of MCPal:        " + MC_PAL_LOCATION_DIR);
+        System.out.println("Path of the server:   " + SERVER_DIR_PATH);
         System.out.println("Path for the backups: " + BACKUP_TARGET_DIR_PATH);
         System.out.println("Additional commands:  ");
-        ADDITIONAL_COMMANDS_AFTER_BACKUP.forEach(c -> System.out.println("                      " + c));
+        BEDROCK_SERVER_COMMANDS_AFTER_BACKUP.forEach(c -> System.out.println("                      " + c));
         System.out.println("***********************");
     }
 
@@ -88,9 +89,9 @@ public class Server {
         } else {
             Process process = null;
             try {
-                final ProcessBuilder processBuilder = new ProcessBuilder(SERVER_DIR_PATH.toString() + "/bedrock_server");
+                final ProcessBuilder processBuilder = new ProcessBuilder(SERVER_DIR_PATH + "/bedrock_server");
                 processBuilder.environment().put("LD_LIBRARY_PATH", SERVER_DIR_PATH.toString());
-                processBuilder.directory(MC_PAL_LOCATION_DIR.toFile());
+                processBuilder.directory(SERVER_DIR_PATH.toFile());
                 process = processBuilder.start();
 
                 if (consoleThread != null) consoleThread.interrupt();
@@ -150,12 +151,12 @@ public class Server {
             Thread.sleep(2000);
 
             Files.createDirectories(BACKUP_TARGET_DIR_PATH);
-            final Backup backupHandler = new Backup(MC_PAL_LOCATION_DIR, BACKUP_TARGET_DIR_PATH);
+            final Backup backupHandler = new Backup(SERVER_DIR_PATH, BACKUP_TARGET_DIR_PATH);
             final FutureTask<String> futureTask = new FutureTask<>(backupHandler);
             new Thread(futureTask).start();
             final String backupStorePath = futureTask.get();
 
-            final List<String> commandListClone = new ArrayList<>(ADDITIONAL_COMMANDS_AFTER_BACKUP);
+            final List<String> commandListClone = new ArrayList<>(BEDROCK_SERVER_COMMANDS_AFTER_BACKUP);
             commandListClone.replaceAll(command -> command.replace("{2}", backupStorePath));
             new Thread(() -> {
                 for (String command : commandListClone) {

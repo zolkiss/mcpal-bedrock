@@ -27,12 +27,12 @@ application {
 }
 
 task fatJar(type: Jar) {
-    manifest {
-        attributes 'Implementation-Title': 'McPal',
-                'Implementation-Version': '1.0.1',
-                'Main-Class': 'Bootstrapper'
-    }
-    archiveBaseName.set(project.name)
-    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    manifest.attributes(
+            'Implementation-Title': 'McPal',
+            'Implementation-Version': '1.0.1',
+            'Main-Class': 'Bootstrapper'
+    )
+    archiveBaseName.set(project.name + '-custom')
+    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
     with jar
 }
