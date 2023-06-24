@@ -95,8 +95,11 @@ public class Server {
                 process = processBuilder.start();
 
                 if (consoleThread != null) consoleThread.interrupt();
-                consoleThread = new Thread(new MinecraftConsole(process.getInputStream()));
+                MinecraftConsole minecraftConsole = new MinecraftConsole(process.getInputStream(), process.getOutputStream());
+                consoleThread = new Thread(minecraftConsole);
                 consoleThread.start();
+
+                BEDROCK_SERVER_COMMANDS_AFTER_BACKUP.forEach(minecraftConsole::sendCommand);
 
                 isServerRunning = true;
 
@@ -116,7 +119,6 @@ public class Server {
 
             consoleWriter.println("stop");
             consoleWriter.flush();
-            //w.close();
             try {
                 process.waitFor(10, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
@@ -133,15 +135,24 @@ public class Server {
     private static void printCountDown(PrintWriter w, String reason) {
         w.println("say " + reason + " begins in 10...");
         w.flush();
-        try {Thread.sleep(1000);} catch (InterruptedException e) {}
-        for (int i=9; i>0; --i) {
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+        }
+        for (int i = 9; i > 0; --i) {
             w.println("say " + i + "...");
             w.flush();
-            try {Thread.sleep(1000);} catch (InterruptedException e) {}
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+            }
         }
         w.println("say GAME OVER!!!!!!!!!!!!!");
         w.flush();
-        try {Thread.sleep(200);} catch (InterruptedException e) {}
+        try {
+            Thread.sleep(200);
+        } catch (InterruptedException e) {
+        }
     }
 
     public static synchronized void backupServer() {
