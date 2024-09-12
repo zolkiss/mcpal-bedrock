@@ -13,7 +13,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static model.Variables.MCPAL_TAG;
 
@@ -24,31 +27,33 @@ import static model.Variables.MCPAL_TAG;
  * - Fix the console input
  */
 public class Server {
-
     public static volatile boolean isServerRunning = false;
 
-    public static Path MC_PAL_LOCATION_DIR;
-    public static Path BACKUP_TARGET_DIR_PATH;
+    private static Path MC_PAL_LOCATION_DIR;
+    private static Path BACKUP_TARGET_DIR_PATH;
+    private static Path SERVER_DIR_PATH;
 
-    private static List<String> ADDITIONAL_COMMANDS_AFTER_BACKUP;
+    private static List<String> BEDROCK_SERVER_COMMANDS_AFTER_BACKUP;
     private static Thread consoleThread;
     private static Thread consoleWriterThread;
     public static volatile Process serverProcess;
 
-    public Server(Path mcPalLocationDir, String targetDir, List<String> additionalThingsToRun) {
-        MC_PAL_LOCATION_DIR = mcPalLocationDir;
-        BACKUP_TARGET_DIR_PATH = Paths.get(targetDir);
-        ADDITIONAL_COMMANDS_AFTER_BACKUP = additionalThingsToRun;
+    public Server(Path mcPalLocationDir, String targetDir, String serverPath, List<String> bedrockServerCommands) {
+        MC_PAL_LOCATION_DIR = mcPalLocationDir.toAbsolutePath();
+        BACKUP_TARGET_DIR_PATH = Paths.get(targetDir).toAbsolutePath();
+        SERVER_DIR_PATH = Paths.get(serverPath).toAbsolutePath();
+        BEDROCK_SERVER_COMMANDS_AFTER_BACKUP = bedrockServerCommands;
 
         printStartupInfo();
     }
 
     private void printStartupInfo() {
         System.out.println("***********************");
-        System.out.println("Path of the server:   " + MC_PAL_LOCATION_DIR);
+        System.out.println("Path of MCPal:        " + MC_PAL_LOCATION_DIR);
+        System.out.println("Path of the server:   " + SERVER_DIR_PATH);
         System.out.println("Path for the backups: " + BACKUP_TARGET_DIR_PATH);
         System.out.println("Additional commands:  ");
-        ADDITIONAL_COMMANDS_AFTER_BACKUP.forEach(c -> System.out.println("                      " + c));
+        BEDROCK_SERVER_COMMANDS_AFTER_BACKUP.forEach(c -> System.out.println("                      " + c));
         System.out.println("***********************");
     }
 
@@ -84,14 +89,17 @@ public class Server {
         } else {
             Process process = null;
             try {
-                final ProcessBuilder processBuilder = new ProcessBuilder("./bedrock_server");
-                processBuilder.environment().put("LD_LIBRARY_PATH", ".");
-                processBuilder.directory(MC_PAL_LOCATION_DIR.toFile());
+                final ProcessBuilder processBuilder = new ProcessBuilder(SERVER_DIR_PATH + "/bedrock_server");
+                processBuilder.environment().put("LD_LIBRARY_PATH", SERVER_DIR_PATH.toString());
+                processBuilder.directory(SERVER_DIR_PATH.toFile());
                 process = processBuilder.start();
 
                 if (consoleThread != null) consoleThread.interrupt();
-                consoleThread = new Thread(new MinecraftConsole(process.getInputStream()));
+                MinecraftConsole minecraftConsole = new MinecraftConsole(process.getInputStream(), process.getOutputStream());
+                consoleThread = new Thread(minecraftConsole);
                 consoleThread.start();
+
+                BEDROCK_SERVER_COMMANDS_AFTER_BACKUP.forEach(minecraftConsole::sendCommand);
 
                 isServerRunning = true;
 
@@ -111,7 +119,6 @@ public class Server {
 
             consoleWriter.println("stop");
             consoleWriter.flush();
-            //w.close();
             try {
                 process.waitFor(10, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
@@ -128,15 +135,24 @@ public class Server {
     private static void printCountDown(PrintWriter w, String reason) {
         w.println("say " + reason + " begins in 10...");
         w.flush();
-        try {Thread.sleep(1000);} catch (InterruptedException e) {}
-        for (int i=9; i>0; --i) {
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+        }
+        for (int i = 9; i > 0; --i) {
             w.println("say " + i + "...");
             w.flush();
-            try {Thread.sleep(1000);} catch (InterruptedException e) {}
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+            }
         }
         w.println("say GAME OVER!!!!!!!!!!!!!");
         w.flush();
-        try {Thread.sleep(200);} catch (InterruptedException e) {}
+        try {
+            Thread.sleep(200);
+        } catch (InterruptedException e) {
+        }
     }
 
     public static synchronized void backupServer() {
@@ -146,12 +162,12 @@ public class Server {
             Thread.sleep(2000);
 
             Files.createDirectories(BACKUP_TARGET_DIR_PATH);
-            final Backup backupHandler = new Backup(MC_PAL_LOCATION_DIR, BACKUP_TARGET_DIR_PATH);
+            final Backup backupHandler = new Backup(SERVER_DIR_PATH, BACKUP_TARGET_DIR_PATH);
             final FutureTask<String> futureTask = new FutureTask<>(backupHandler);
             new Thread(futureTask).start();
             final String backupStorePath = futureTask.get();
 
-            final List<String> commandListClone = new ArrayList<>(ADDITIONAL_COMMANDS_AFTER_BACKUP);
+            final List<String> commandListClone = new ArrayList<>(BEDROCK_SERVER_COMMANDS_AFTER_BACKUP);
             commandListClone.replaceAll(command -> command.replace("{2}", backupStorePath));
             new Thread(() -> {
                 for (String command : commandListClone) {
